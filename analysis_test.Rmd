@@ -1,0 +1,162 @@
+---
+title: "analysis_test"
+author: "Thanh La"
+date: "10/27/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Finish
+```{r}
+library(tidyverse)
+data <- read.csv("data.csv")
+
+numeric_data <- data[,3:32 ]
+summary(numeric_data)
+
+mean_Vec <- apply(numeric_data, 2, mean)
+
+# pairs plot, looking at mean variables only
+data %>% filter(diagnosis == "M") %>% select_if(is.numeric) %>% select(contains("mean")) %>% pairs()
+data %>% filter(diagnosis == "B") %>% select_if(is.numeric) %>% select(contains("mean")) %>% pairs()
+# also look at the se and worst too
+
+# look at how the variables are differently distributed between the two groups
+data %>% group_by(diagnosis) %>% ggplot(aes(x = smoothness_mean, col = diagnosis))  + geom_density()
+
+```
+ 
+# logistic regression
+```{r}
+library(ISLR)
+library(tidyverse)
+
+data(Default)
+glimpse(Default)
+```
+
+```{r}
+## start with one variable
+## function: glm (stands for general linear model)
+## "formula" y ~ x (dependent/outcome/classes ~ variables)
+## family = "binomial" is how we make it a *logistic* regression
+## data = our_data_frame
+default_lm <- glm(default ~ balance, family = "binomial", data = Default)
+summary(default_lm)
+```
+
+```{r}
+# the output of our model: 
+  # the probability that that subject will default, P(Default | balance information)
+y_hat <- predict(default_lm, data = Default, type = "response")
+predicted_class <- vector(length = length(y_hat))
+predicted_class[y_hat > 0.5] <- "Yes"
+predicted_class[y_hat <= 0.5] <- "No"
+predicted_class <- as.factor(predicted_class)
+
+```
+
+```{r}
+## how do we know 1 is no and 2 is yes:
+levels(Default$default)
+levels(predicted_class)
+
+
+x <- cbind(predicted_class, Default$default)
+## we sum up the logical/Boolean vector here to see how many times our model was right
+sum(predicted_class == Default$default) 
+
+## divide that by the number of observations to see our accuracy
+sum(predicted_class == Default$default) / length(predicted_class) * 100
+
+## Note: this is the accuracy on data used to build/create the model. 
+## we're going to be interested in how well the model works on NEW data. 
+
+```
+
+# Example
+```{r}
+# install.packages("palmerpenguins")
+library(palmerpenguins)
+
+my_penguin <- penguins %>% na.omit() %>% filter(species %in% c("Adelie", "Chinstrap")) 
+
+my_penguin
+## with multiple variables, pick a few and then use the accuracy of the model to find a good combination of variables
+## you will need to use "as.factor" on the y to change it from a character vector to a factor
+    ## Or use strings.as.Factors == T
+```
+
+```{r}
+
+#### 
+my_penguin_model <- glm(species ~., family = "binomial",  data = my_penguin)
+summary(my_penguin_model)
+```
+
+```{r}
+## the output of this function is the *probability* of being in the second class, in this case, Chinstrap
+y_hat <- predict(my_penguin_model, data = my_penguin, type = "response")
+```
+
+```{r}
+levels(my_penguin$species)
+levels(predicted_class)
+```
+
+```{r}
+predicted_class <- vector(length = length(y_hat))
+predicted_class[y_hat > 0.5] <- "Chinstrap"
+predicted_class[y_hat <= 0.5] <- "Adelie"
+predicted_class <- as.factor(predicted_class)
+```
+
+```{r}
+## table of my predictions vs the truth
+table(predicted_class, my_penguin$species)
+
+## accuracy: num of times the model is right / total number of times 
+(146 + 68) / length(predicted_class)
+
+```
+
+Mean, SE, worst workfile is worked really good
+```{r}
+# mean_workfile = workfile %>% select(diagnosis,contains("mean"))
+# SE_workfile = workfile %>% select(diagnosis,contains("SE"))
+# worst_workfile = workfile %>% select(diagnosis,contains("worst"))
+```
+
+```{r}
+# head(mean_workfile)
+# head(SE_workfile)
+# head(worst_workfile)
+```
+
+```{r}
+# meanworkfile_glm = glm(diagnosis ~ ., family = "binomial", data = mean_workfile)
+# SEworkfile_glm = glm(diagnosis ~ ., family = "binomial", data = SE_workfile)
+# worstworkfile_glm = glm(diagnosis ~ ., family = "binomial", data = worst_workfile)
+```
+
+```{r}
+# summary(meanworkfile_glm)
+# summary(SEworkfile_glm)
+# summary(worstworkfile_glm)
+```
+
+```{r}
+# y_hat = predict(meanworkfile_glm, data = mean_workfile, type = "response")
+# y_hat = predict(SEworkfile_glm, data = SE_workfile, type = "response")
+# y_hat = predict(Worstworkfile_glm, data = worst_workfile, type = "response")
+```
+
+```{r}
+
+```
+
+
+
