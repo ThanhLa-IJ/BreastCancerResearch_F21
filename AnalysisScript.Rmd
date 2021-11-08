@@ -21,7 +21,9 @@ library(GGally)
 library(ISLR)
 library(caret)
 library(cowplot)
-  
+library(MASS)
+library(dplyr)
+
 ```
 
 
@@ -40,10 +42,6 @@ colnames(workfile)
 summary(numeric_workfile)
 all(is.na(workfile))
 ```
-```{r, warning=F}
-#mean of each varible, group by diagnosis
-workfile_mean <- workfile %>% group_by(diagnosis)%>%summarise_at(vars(-id),funs(mean(., na.rm=TRUE)))
-```
 
 # workfile Visualization
 
@@ -56,18 +54,18 @@ group[workfile$diagnosis == "M"] = 2
 
 
 workfile %>% 
-  select_if(is.numeric) %>% 
-  select(contains("mean")) %>% 
+  select_if(is.numeric) %>%
+  dplyr::select(contains("mean")) %>%
   pairs(col = c("blue", "red")[group], main = "The relationship between 'Mean' variable")
 
 workfile %>% 
   select_if(is.numeric) %>% 
-  select(contains("SE")) %>% 
+  dplyr::select(contains("SE")) %>% 
   pairs(col = c("blue", "red")[group], main = "The relationship between 'Standard Error' variable")
 
 workfile %>% 
   select_if(is.numeric) %>% 
-  select(contains("worst")) %>% 
+  dplyr::select(contains("worst")) %>% 
   pairs(col = c("blue", "red")[group], main = "The relationship between 'Worst' variable") 
 ```
 
@@ -83,13 +81,13 @@ ggpairs(workfile[,c(3:12,2)], aes(color=diagnosis, alpha=0.5), lower=list(contin
 ```{r}
 ggpairs(workfile[,c(13:22,2)], aes(color=diagnosis, alpha=0.5), lower=list(continuous="smooth"))
 ```
-cor()#
-cov()#
-https://www.rdocumentation.org/packages/stats/versions/3.6.2/topics/cor
-
 ```{r}
 ggpairs(workfile[,c(23:32,2)], aes(color=diagnosis, alpha=0.5), lower=list(continuous="smooth"))
 ```
+
+cor()#
+cov()#
+https://www.rdocumentation.org/packages/stats/versions/3.6.2/topics/cor
 
 # III. Logistic Regression Model
 ```{r}
@@ -102,108 +100,83 @@ head(workfile)
 ```
 
 
-Apply logistic regression to data that contain only mean variable
-```{r}
-workfile_glm = glm(diagnosis~., family = "binomial", data = workfile)
+# Apply logistic regression to data 
 
-# radius_mean + radius_se + radius_worst + texture_mean + texture_se + texture_worst + area_mean + area_se + area_worst + smoothness_mean + smoothness_se + smoothness_worst + concavity_mean + concavity_se + concavity_worst + concave.points_mean + concave.points_se + concave.points_worst + fractal_dimension_mean +  fractal_dimension_se + fractal_dimension_worst
-
-```
-```{r}
-summary(workfile_glm)
-```
-
-
-
-```{r}
-y_hat = predict(workfile_glm, data = workfile, type = "response")
-predicted_class <- vector(length = length(y_hat))
-predicted_class[y_hat > 0.5] <- "M"
-predicted_class[y_hat <= 0.5] <- "B"
-predicted_class <- as.factor(predicted_class)
-```
-
-```{r}
-## the output of this function is the *probability* of being in the second class
-levels(workfile$diagnosis)
-levels(predicted_class)
-```
-
-```{r}
-# table(predicted_class, mean_workfile$diagnosis)
-confusionMatrix(predicted_class, workfile$diagnosis)
+```{r, include = F, echo  =F}
+# Set the train and test part of valiadation dataset
+index_set = sample(2, nrow(workfile), replace = T, prob = c(0.9, 0.1))
+train_workfile = workfile[index_set == 1,] 
+test_workfile = workfile[index_set == 2,]
 ```
 
 To make the logistic regression model more efficient (or improve the probability of the prediction), I will separate the characteristic variable to different part such as: size, shape, surface
++ Every variable
+```{r}
+by_all = function(workfile){
+  workfile_glm = glm(diagnosis~ ., family = "binomial", data = workfile)
+  return(workfile_glm)
+}
+```
+
 + Size: Radius, perimeter, area, compactness, fractal dimension
-+ shape, surface: texture, smoothness, concavity, concave.points, symmetry, fractal dimension
-
-Size: 
 
 ```{r}
-workfile_glm = glm(diagnosis~ radius_mean + radius_se + radius_worst + perimeter_mean + perimeter_se + perimeter_worst + area_mean + area_se + area_worst + compactness_mean + compactness_se + compactness_worst + fractal_dimension_mean +  fractal_dimension_se + fractal_dimension_worst, family = "binomial", data = workfile)
+by_size = function(workfile){
+  workfile_glm = glm(diagnosis~ radius_mean + radius_se + radius_worst + perimeter_mean + perimeter_se + perimeter_worst + area_mean + area_se + area_worst + compactness_mean + compactness_se + compactness_worst + fractal_dimension_mean +  fractal_dimension_se + fractal_dimension_worst, family = "binomial", data = workfile)
+  return(workfile_glm)
+}
 ```
+
++shape, surface: texture, smoothness, concavity, concave.points, symmetry, fractal dimension
 ```{r}
+by_shape = function(workfile){
+  workfile_glm = glm(diagnosis~ texture_mean + texture_se + texture_worst + smoothness_mean + smoothness_se + smoothness_worst + concavity_mean + concavity_se + concavity_worst + concave.points_mean + concave.points_se + concave.points_worst + symmetry_mean + symmetry_se + symmetry_worst + fractal_dimension_mean +  fractal_dimension_se + fractal_dimension_worst, family = "binomial", data = workfile)
+  return(workfile_glm)
+}
+
+```
+
+
+#  Build a Train - Test of Logistic Regression 
+
+Train - test by size
+
+```{r}
+workfile_glm = by_all(train_workfile)
 summary(workfile_glm)
 ```
+
 ```{r}
-y_hat = predict(workfile_glm, data = workfile, type = "response")
+# now ewe predict on the test data
+y_hat = predict(workfile_glm, newdata = test_workfile, type = "response")
 predicted_class <- vector(length = length(y_hat))
 predicted_class[y_hat > 0.5] <- "M"
 predicted_class[y_hat <= 0.5] <- "B"
 predicted_class <- as.factor(predicted_class)
 
-confusionMatrix(predicted_class, workfile$diagnosis)
-```
-```{r}
-predicted_data = data.frame(prob.diagnosis = workfile_glm$fitted.values, diagnosis = workfile$diagnosis)
+confusionMatrix(predicted_class, test_workfile$diagnosis)
 
-predicted_data = predicted_data[order(predicted_data$prob.diagnosis, decreasing = F),]
 
-predicted_data$rank = 1:nrow(predicted_data)
-
-ggplot(predicted_data, aes(x = rank, y = prob.diagnosis))+
-  geom_point(aes(color = diagnosis), alpha = 1, shape = 4, stroke = 2) +
-  xlab("Index")+
-  ylab("Predicted probability of Breast Cancer level (B or M)")+
-  ggtitle("Predicted Breast Cancer level base on size of  CT Breast")
 
 ```
 
-Shape, Surface:
 
-texture, smoothness, concavity, concave.points, symmetry, fractal dimension
 
-```{r}
-workfile_glm = glm(diagnosis~ texture_mean + texture_se + texture_worst + smoothness_mean + smoothness_se + smoothness_worst + concavity_mean + concavity_se + concavity_worst + concave.points_mean + concave.points_se + concave.points_worst + symmetry_mean + symmetry_se + symmetry_worst + fractal_dimension_mean +  fractal_dimension_se + fractal_dimension_worst, family = "binomial", data = workfile)
-```
-```{r}
-summary(workfile_glm)
-```
-```{r}
-y_hat = predict(workfile_glm, data = workfile, type = "response")
-predicted_class <- vector(length = length(y_hat))
-predicted_class[y_hat > 0.5] <- "M"
-predicted_class[y_hat <= 0.5] <- "B"
-predicted_class <- as.factor(predicted_class)
 
-confusionMatrix(predicted_class, workfile$diagnosis)
-```
 
-Visualize the Logistic regression
 
-```{r}
-predicted_data = data.frame(prob.diagnosis = workfile_glm$fitted.values, diagnosis = workfile$diagnosis)
 
-predicted_data = predicted_data[order(predicted_data$prob.diagnosis, decreasing = F),]
 
-predicted_data$rank = 1:nrow(predicted_data)
 
-ggplot(predicted_data, aes(x = rank, y = prob.diagnosis))+
-  geom_point(aes(color = diagnosis), alpha = 1, shape = 4, stroke = 2) +
-  xlab("Index")+
-  ylab("Predicted probability of Breast Cancer level (B or M)")+
-  ggtitle("Predicted Breast Cancer level base on surface of  CT Breast")
 
-```
+
+
+
+
+
+
+
+
+
+
 

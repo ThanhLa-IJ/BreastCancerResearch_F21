@@ -160,3 +160,159 @@ Mean, SE, worst workfile is worked really good
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+***Main***
+```{r}
+workfile_glm = glm(diagnosis~., family = "binomial", data = workfile)
+summary(workfile_glm)
+```
+```{r}
+y_hat = predict(workfile_glm, data = workfile, type = "response")
+predicted_class <- vector(length = length(y_hat))
+predicted_class[y_hat > 0.5] <- "M"
+predicted_class[y_hat <= 0.5] <- "B"
+predicted_class <- as.factor(predicted_class)
+```
+```{r}
+## the output of this function is the *probability* of being in the second class
+levels(workfile$diagnosis)
+levels(predicted_class)
+```
+```{r}
+confusionMatrix(predicted_class, workfile$diagnosis)
+
+# table(predicted_class, workfile$diagnosis)
+# (68 + 57) / length(predicted_class)
+```
+
+
+
+
+
+
+
+To make the logistic regression model more efficient (or improve the probability of the prediction), I will separate the characteristic variable to different part such as: size, shape, surface
++ Size: Radius, perimeter, area, compactness, fractal dimension
++ shape, surface: texture, smoothness, concavity, concave.points, symmetry, fractal dimension
+
+# radius_mean + radius_se + radius_worst + texture_mean + texture_se + texture_worst + area_mean + area_se + area_worst + smoothness_mean + smoothness_se + smoothness_worst + concavity_mean + concavity_se + concavity_worst + concave.points_mean + concave.points_se + concave.points_worst + fractal_dimension_mean +  fractal_dimension_se + fractal_dimension_worst
+
+
+Size: 
+
+```{r}
+workfile_glm = glm(diagnosis~ radius_mean + radius_se + radius_worst + perimeter_mean + perimeter_se + perimeter_worst + area_mean + area_se + area_worst + compactness_mean + compactness_se + compactness_worst + fractal_dimension_mean +  fractal_dimension_se + fractal_dimension_worst, family = "binomial", data = workfile)
+```
+```{r}
+summary(workfile_glm)
+```
+```{r}
+y_hat = predict(workfile_glm, data = workfile, type = "response")
+predicted_class <- vector(length = length(y_hat))
+predicted_class[y_hat > 0.5] <- "M"
+predicted_class[y_hat <= 0.5] <- "B"
+predicted_class <- as.factor(predicted_class)
+
+confusionMatrix(predicted_class, workfile$diagnosis)
+```
+```{r}
+predicted_data = data.frame(prob.diagnosis = workfile_glm$fitted.values, diagnosis = workfile$diagnosis)
+
+predicted_data = predicted_data[order(predicted_data$prob.diagnosis, decreasing = F),]
+
+predicted_data$rank = 1:nrow(predicted_data)
+
+ggplot(predicted_data, aes(x = rank, y = prob.diagnosis))+
+  geom_point(aes(color = diagnosis), alpha = 1, shape = 4, stroke = 2) +
+  xlab("Index")+
+  ylab("Predicted probability of Breast Cancer level (B or M)")+
+  ggtitle("Predicted Breast Cancer level base on size of  CT Breast")
+
+```
+
+Shape, Surface:
+
+texture, smoothness, concavity, concave.points, symmetry, fractal dimension
+
+```{r}
+workfile_glm = glm(diagnosis~ texture_mean + texture_se + texture_worst + smoothness_mean + smoothness_se + smoothness_worst + concavity_mean + concavity_se + concavity_worst + concave.points_mean + concave.points_se + concave.points_worst + symmetry_mean + symmetry_se + symmetry_worst + fractal_dimension_mean +  fractal_dimension_se + fractal_dimension_worst, family = "binomial", data = workfile)
+```
+```{r}
+summary(workfile_glm)
+```
+```{r}
+y_hat = predict(workfile_glm, data = workfile, type = "response")
+predicted_class <- vector(length = length(y_hat))
+predicted_class[y_hat > 0.5] <- "M"
+predicted_class[y_hat <= 0.5] <- "B"
+predicted_class <- as.factor(predicted_class)
+
+confusionMatrix(predicted_class, workfile$diagnosis)
+```
+
+
+```{r}
+predicted_data = data.frame(prob.diagnosis = workfile_glm$fitted.values, diagnosis = workfile$diagnosis)
+
+predicted_data = predicted_data[order(predicted_data$prob.diagnosis, decreasing = F),]
+
+predicted_data$rank = 1:nrow(predicted_data)
+
+ggplot(predicted_data, aes(x = rank, y = prob.diagnosis))+
+  geom_point(aes(color = diagnosis), alpha = 1, shape = 4, stroke = 2) +
+  xlab("Index")+
+  ylab("Predicted probability of Breast Cancer level (B or M)")+
+  ggtitle("Predicted Breast Cancer level base on surface of  CT Breast")
+
+```
+
+
+Train test
+
+
+```{r}
+# Now set the train data into the logistic regresion to train it, then apply to test data to test the model
+# Test predict base on size
+workfile_glm = glm(diagnosis~., family = "binomial", data = train_workfile)
+summary(workfile_glm)
+
+```
+
+```{r}
+# now ewe predict on the test data
+y_hat = predict(workfile_glm, newdata = test_workfile, type = "response")
+predicted_class <- vector(length = length(y_hat))
+predicted_class[y_hat > 0.5] <- "M"
+predicted_class[y_hat <= 0.5] <- "B"
+predicted_class <- as.factor(predicted_class)
+
+confusionMatrix(predicted_class, test_workfile$diagnosis)
+# table(predicted_class, train_workfile$diagnosis)
+# (325 + 188) / length(predicted_class)
+
+```
