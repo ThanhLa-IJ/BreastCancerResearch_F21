@@ -12,7 +12,7 @@ director: Dr. Katherine Shoemaker
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r}
+```{r, include=F}
 library(tidyverse)
 library(reshape2)
 library(reshape)
@@ -76,13 +76,16 @@ workfile %>%
 # these variables below are greatly different among 2 group of diagnosis
 
 ```{r}
-ggpairs(workfile[,c(3:12,2)], aes(color=diagnosis, alpha=0.5), lower=list(continuous="smooth"))
+ggpairs(workfile[,c(3:12,2)], aes(color=diagnosis, alpha=0.5), lower=list(continuous="smooth"))+
+theme(plot.title=element_text(face='bold',color='black',hjust=0.5,size=12))
 ```
 ```{r}
-ggpairs(workfile[,c(13:22,2)], aes(color=diagnosis, alpha=0.5), lower=list(continuous="smooth"))
+ggpairs(workfile[,c(13:22,2)], aes(color=diagnosis, alpha=0.5), lower=list(continuous="smooth"))+
+theme(plot.title=element_text(face='bold',color='black',hjust=0.5,size=12))
 ```
 ```{r}
-ggpairs(workfile[,c(23:32,2)], aes(color=diagnosis, alpha=0.5), lower=list(continuous="smooth"))
+ggpairs(workfile[,c(23:32,2)], aes(color=diagnosis, alpha=0.5), lower=list(continuous="smooth"))+
+theme(plot.title=element_text(face='bold',color='black',hjust=0.5,size=12))
 ```
 
 cor()#
@@ -96,24 +99,54 @@ workfile = subset(workfile, select = -c(id))
 ```
 
 ```{r}
+str(workfile)
+```
+
+```{r}
 head(workfile)
+```
+# Apply Stepwise Regression to find Correlattion of variable
+
+```{r, warning=F}
+# backward stepwise regression
+full_model = glm(diagnosis~., family = "binomial", data = workfile)
+backward_model = step(full_model, direction = "backward")
+```
+
+```{r}
+# forward stepwise regression
+null_model = glm(diagnosis~1, family = "binomial", data = workfile)
+
+forwar_model = step(null_model, 
+                    scope = list(lower = formula(null_model),
+                                 uper = formula(null_model)),
+                    direction = "forward")
 ```
 
 
 # Apply logistic regression to data 
 
+```{r}
+train_control = trainControl(method = "repeatedcv", number = 10, repeats = 20)
+```
+
 ```{r, include = F, echo  =F}
 # Set the train and test part of valiadation dataset
-index_set = sample(2, nrow(workfile), replace = T, prob = c(0.9, 0.1))
+index_set = sample(2, nrow(workfile), replace = T, prob = c(0.7, 0.3))
 train_workfile = workfile[index_set == 1,] 
 test_workfile = workfile[index_set == 2,]
 ```
 
 To make the logistic regression model more efficient (or improve the probability of the prediction), I will separate the characteristic variable to different part such as: size, shape, surface
+
 + Every variable
 ```{r}
-by_all = function(workfile){
-  workfile_glm = glm(diagnosis~ ., family = "binomial", data = workfile)
+by_all = function(workfile, train_control){
+  workfile_glm = train(diagnosis~.,
+                       data = workfile, 
+                       trControl = train_control, 
+                       method = "glm", 
+                       family = binomial())
   return(workfile_glm)
 }
 ```
@@ -121,18 +154,61 @@ by_all = function(workfile){
 + Size: Radius, perimeter, area, compactness, fractal dimension
 
 ```{r}
-by_size = function(workfile){
-  workfile_glm = glm(diagnosis~ radius_mean + radius_se + radius_worst + perimeter_mean + perimeter_se + perimeter_worst + area_mean + area_se + area_worst + compactness_mean + compactness_se + compactness_worst + fractal_dimension_mean +  fractal_dimension_se + fractal_dimension_worst, family = "binomial", data = workfile)
+by_size = function(workfile, train_control){
+  workfile_glm = train(diagnosis~radius_mean + radius_se + radius_worst + 
+                         perimeter_mean + perimeter_se + perimeter_worst + 
+                         area_mean + area_se + area_worst + 
+                         compactness_mean + compactness_se + compactness_worst + 
+                         fractal_dimension_mean +  fractal_dimension_se + fractal_dimension_worst
+                       ,data = workfile, 
+                       trControl = train_control, 
+                       method = "glm", 
+                       family = binomial())
+  
   return(workfile_glm)
 }
 ```
 
-+shape, surface: texture, smoothness, concavity, concave.points, symmetry, fractal dimension
++ Shape, surface: texture, smoothness, concavity, concave.points, symmetry, fractal dimension
+
 ```{r}
-by_shape = function(workfile){
-  workfile_glm = glm(diagnosis~ texture_mean + texture_se + texture_worst + smoothness_mean + smoothness_se + smoothness_worst + concavity_mean + concavity_se + concavity_worst + concave.points_mean + concave.points_se + concave.points_worst + symmetry_mean + symmetry_se + symmetry_worst + fractal_dimension_mean +  fractal_dimension_se + fractal_dimension_worst, family = "binomial", data = workfile)
+by_shape = function(workfile, train_control){
+  workfile_glm = train(diagnosis~ texture_mean + texture_se + texture_worst + 
+                         smoothness_mean + smoothness_se + smoothness_worst + 
+                         concavity_mean + concavity_se + concavity_worst + 
+                         concave.points_mean + concave.points_se + concave.points_worst + 
+                         symmetry_mean + symmetry_se + symmetry_worst + 
+                         fractal_dimension_mean +  fractal_dimension_se + fractal_dimension_worst, 
+                       data = workfile,
+                       method = "glm", 
+                       family = binomial())
   return(workfile_glm)
 }
+
+```
+
++ Stepwise Backward suggest
+
+```{r}
+by_stepwise_backward = function(workfile, train_control){
+  workfile_glm = train(diagnosis ~ radius_mean + texture_mean + area_mean + smoothness_mean + 
+    compactness_mean + concavity_mean + concave.points_mean + 
+    symmetry_mean + fractal_dimension_mean + perimeter_se + area_se + 
+    smoothness_se + compactness_se + concavity_se + concave.points_se + 
+    symmetry_se + fractal_dimension_se + radius_worst + texture_worst + 
+    perimeter_worst + area_worst + concavity_worst + symmetry_worst + 
+    fractal_dimension_worst, 
+                       data = workfile,
+                       method = "glm", 
+                       family = binomial())
+  
+  return(workfile_glm)
+}
+```
+
++ Stepwise Forward Suggest
+
+```{r}
 
 ```
 
@@ -141,25 +217,26 @@ by_shape = function(workfile){
 
 Train - test by size
 
-```{r}
-workfile_glm = by_all(train_workfile)
+```{r, warning=F}
+workfile_glm = by_all(workfile, train_control)
+workfile_glm
 summary(workfile_glm)
 ```
 
 ```{r}
 # now ewe predict on the test data
-y_hat = predict(workfile_glm, newdata = test_workfile, type = "response")
-predicted_class <- vector(length = length(y_hat))
-predicted_class[y_hat > 0.5] <- "M"
-predicted_class[y_hat <= 0.5] <- "B"
-predicted_class <- as.factor(predicted_class)
-
-confusionMatrix(predicted_class, test_workfile$diagnosis)
-
-
+y_hat = predict(workfile_glm, newdata = workfile)
+confusionMatrix(y_hat, workfile$diagnosis)
 
 ```
 
+```{r}
+y_hat = as.vector(y_hat)
+diagnosis = as.vector(test_workfile$diagnosis)
+
+check_table = data.frame(ML_result = y_hat, correct_result = diagnosis ) %>% 
+  mutate(checked = ifelse(ML_result == correct_result, "Yes", "No"))
+```
 
 
 

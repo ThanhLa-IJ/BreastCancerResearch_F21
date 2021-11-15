@@ -316,3 +316,21 @@ confusionMatrix(predicted_class, test_workfile$diagnosis)
 # (325 + 188) / length(predicted_class)
 
 ```
+
+# Step wise model
+```{r}
+full_model = glm(diagnosis~., family = "binomial", data = data)
+backward_model = step(fullworkfile, direction = "backward")
+
+
+
+null_model = glm(diagnosis~1, family = "binomial", data = data)
+
+forwar_model = step(nullworkfile, 
+                    scope = list(lower = formula(null_model),
+                                 uper = formula(null_model)),
+                    direction = "forward")
+
+
+```
+
