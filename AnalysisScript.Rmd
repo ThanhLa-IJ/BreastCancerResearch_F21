@@ -238,8 +238,7 @@ check_table = data.frame(ML_result = y_hat, correct_result = diagnosis ) %>%
   mutate(checked = ifelse(ML_result == correct_result, "Yes", "No"))
 ```
 
-
-
+# Visualization
 
 
 
