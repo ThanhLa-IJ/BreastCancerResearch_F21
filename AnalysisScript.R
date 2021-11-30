@@ -98,5 +98,13 @@ table(predicted_class, my_penguin$species)
 data$diagnosis <- as.factor(data$diagnosis)
 levels(data$diagnosis)
 
+#Backward
+diagnosis_model <- glm (diagnosis ~., data = data, family ="binomial")
+step(diagnosis_model,direction = "backward")
+#Forward
+forward_glm <- glm (diagnosis ~1, data = data, family ="binomial")
+step(forward_glm, direction = "forward",scope=formula(diagnosis_model))
+#Both
+step(forward_glm, direction = "both",scope=formula(diagnosis_model))
 
 

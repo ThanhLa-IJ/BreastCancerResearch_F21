@@ -1,0 +1,93 @@
+---
+title: "test1"
+author: "Thanh La"
+date: "11/24/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(reshape2)
+library(reshape)
+library(ggplot2)
+library(GGally)
+library(ISLR)
+library(caret)
+library(cowplot)
+library(MASS)
+library(dplyr)
+library(leaps)
+library(ggeffects)
+library(patchwork)
+```
+
+```{r}
+workfile <- read.csv("data.csv")
+numeric_workfile <- workfile[,3:32 ]
+
+workfile$diagnosis = as.factor(workfile$diagnosis)
+workfile = subset(workfile, select = -c(id))
+```
+
+```{r}
+index_set = sample(2, nrow(workfile), replace = T, prob = c(0.8, 0.2))
+train_workfile = workfile[index_set == 1,] 
+test_workfile = workfile[index_set == 2,]
+```
+
+```{r}
+train_control = trainControl(method = "LOOCV", number = nrow(train_workfile))
+
+```
+
+```{r, warning=F}
+workfile_glm = train(diagnosis ~ perimeter_worst + smoothness_worst + 
+    texture_worst + radius_se + symmetry_worst + compactness_se + 
+    concavity_mean + texture_se + area_se + concave.points_worst, 
+                     data = train_workfile,
+                     method = "glm",
+                     trControl = train_control,
+                     family = binomial())
+
+summary(workfile_glm)
+```
+
+
+```{r}
+# now ewe predict on the test data
+y_hat = predict(workfile_glm, newdata = test_workfile)
+y_hat_prob = predict(workfile_glm, newdata = test_workfile, type = "prob")
+test_workfile$predict_diagnosis = y_hat
+test_workfile$predict_diagnosis_prob = y_hat_prob$M
+
+```
+
+```{r}
+confusionMatrix(y_hat, test_workfile$diagnosis)
+```
+
+```{r}
+test_workfile$predict_diagnosis = y_hat
+test_workfile = test_workfile %>% dplyr::select(diagnosis, predict_diagnosis, predict_diagnosis_prob, everything())
+head(test_workfile)
+```
+
+```{r}
+plot(as.numeric(diagnosis)-1~ perimeter_mean, data = train_workfile, col = "blue")
+points(predict_diagnosis_prob~ perimeter_mean, data = test_workfile, col = predict_diagnosis)
+abline(h = 0.5, lty = 3)
+
+```
+
+```{r, fig.width=12, fig.height=6}
+
+plts = lapply(names(workfile_glm$finalModel$coefficients)[-1],function(i){
+       return(plot(ggpredict(workfile_glm$finalModel,i)))
+       })
+
+wrap_plots(plts)
+```

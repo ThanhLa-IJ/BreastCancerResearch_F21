@@ -154,13 +154,56 @@ Mean, SE, worst workfile is worked really good
 # y_hat = predict(Worstworkfile_glm, data = worst_workfile, type = "response")
 ```
 
-```{r}
+<!-- To make the logistic regression model more efficient (or improve the probability of the prediction), I will separate the characteristic variable to different part such as: size, shape, surface -->
 
-```
+<!-- + Every variable -->
+<!-- ```{r} -->
+<!-- by_all = function(workfile, train_control){ -->
+<!--   workfile_glm = train(diagnosis~., -->
+<!--                        data = workfile,  -->
+<!--                        trControl = train_control,  -->
+<!--                        method = "glm",  -->
+<!--                        family = binomial()) -->
+<!--   return(workfile_glm) -->
+<!-- } -->
+<!-- ``` -->
 
+<!-- + Size: Radius, perimeter, area, compactness, fractal dimension -->
 
+<!-- ```{r} -->
+<!-- by_size = function(workfile, train_control){ -->
+<!--   workfile_glm = train(diagnosis~radius_mean + radius_se + radius_worst +  -->
+<!--                          perimeter_mean + perimeter_se + perimeter_worst +  -->
+<!--                          area_mean + area_se + area_worst +  -->
+<!--                          compactness_mean + compactness_se + compactness_worst +  -->
+<!--                          fractal_dimension_mean +  fractal_dimension_se + fractal_dimension_worst -->
+<!--                        ,data = workfile,  -->
+<!--                        trControl = train_control,  -->
+<!--                        method = "glm",  -->
+<!--                        family = binomial()) -->
 
+<!--   return(workfile_glm) -->
+<!-- } -->
+<!-- ``` -->
 
+<!-- + Shape, surface: texture, smoothness, concavity, concave.points, symmetry, fractal dimension -->
+
+<!-- ```{r} -->
+<!-- by_shape = function(workfile, train_control){ -->
+<!--   workfile_glm = train(diagnosis~ texture_mean + texture_se + texture_worst +  -->
+<!--                          smoothness_mean + smoothness_se + smoothness_worst +  -->
+<!--                          concavity_mean + concavity_se + concavity_worst +  -->
+<!--                          concave.points_mean + concave.points_se + concave.points_worst +  -->
+<!--                          symmetry_mean + symmetry_se + symmetry_worst +  -->
+<!--                          fractal_dimension_mean +  fractal_dimension_se + fractal_dimension_worst,  -->
+<!--                        data = workfile, -->
+<!--                        trControl = train_control, -->
+<!--                        method = "glm",  -->
+<!--                        family = binomial()) -->
+<!--   return(workfile_glm) -->
+<!-- } -->
+
+<!-- ``` -->
 
 
 
@@ -334,3 +377,17 @@ forwar_model = step(nullworkfile,
 
 ```
 
+Visualization
+```{r}
+visualize_data = data.frame(prob.diagnosis = workfile_glm$finalModel$fitted.values, diagnosis = train_workfile$diagnosis)
+
+visualize_data = visualize_data[order(visualize_data$prob.diagnosis, decreasing = F),]
+
+visualize_data$rank = 1:nrow(visualize_data)
+
+ggplot(visualize_data, aes(x = rank, y = prob.diagnosis))+
+  geom_point(aes(color = diagnosis), alpha = 1, shape = 4, stroke = 2) +
+  xlab("Index")+
+  ylab("Predicted probability of Breast Cancer level (B or M)")+
+  ggtitle("Predicted Breast Cancer level base on surface of  CT Breast")
+```

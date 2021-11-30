@@ -23,22 +23,29 @@ library(caret)
 library(cowplot)
 library(MASS)
 library(dplyr)
-
+library(leaps)
+library(ggeffects)
+library(patchwork)
 ```
 
 
 ```{r}
 workfile <- read.csv("data.csv")
 numeric_workfile <- workfile[,3:32 ]
+
+#workfile = workfile %>% mutate(diagnosis = case_when(diagnosis == "B" ~ 0,   
+ #                                                    diagnosis == "M" ~ 1))
+
+  
 ```
 
 # workfile Exploration
 
-```{r}
+```{r, include=F}
 colnames(workfile)
 ```
 
-```{r}
+```{r, include=F}
 summary(numeric_workfile)
 all(is.na(workfile))
 ```
@@ -47,7 +54,7 @@ all(is.na(workfile))
 
 # I. Relationship Between Variable
 
-```{r}
+```{r, include = F}
 group = NA
 group[workfile$diagnosis == "B"] = 1
 group[workfile$diagnosis == "M"] = 2
@@ -75,11 +82,11 @@ workfile %>%
 
 # these variables below are greatly different among 2 group of diagnosis
 
-```{r}
+```{r, include=F}
 ggpairs(workfile[,c(3:12,2)], aes(color=diagnosis, alpha=0.5), lower=list(continuous="smooth"))+
 theme(plot.title=element_text(face='bold',color='black',hjust=0.5,size=12))
 ```
-```{r}
+```{r, include=F}
 ggpairs(workfile[,c(13:22,2)], aes(color=diagnosis, alpha=0.5), lower=list(continuous="smooth"))+
 theme(plot.title=element_text(face='bold',color='black',hjust=0.5,size=12))
 ```
@@ -88,108 +95,58 @@ ggpairs(workfile[,c(23:32,2)], aes(color=diagnosis, alpha=0.5), lower=list(conti
 theme(plot.title=element_text(face='bold',color='black',hjust=0.5,size=12))
 ```
 
-cor()#
-cov()#
-https://www.rdocumentation.org/packages/stats/versions/3.6.2/topics/cor
 
 # III. Logistic Regression Model
-```{r}
+```{r, include=F}
 workfile$diagnosis = as.factor(workfile$diagnosis)
 workfile = subset(workfile, select = -c(id))
 ```
 
-```{r}
+```{r, include=F}
 str(workfile)
 ```
 
-```{r}
+```{r, include=F}
 head(workfile)
 ```
 # Apply Stepwise Regression to find Correlattion of variable
 
-```{r, warning=F}
+```{r, warning=F, include = F }
 # backward stepwise regression
 full_model = glm(diagnosis~., family = "binomial", data = workfile)
 backward_model = step(full_model, direction = "backward")
 ```
 
-```{r}
+```{r, warning=F, include = F}
 # forward stepwise regression
-null_model = glm(diagnosis~1, family = "binomial", data = workfile)
+#Forward
+forward_glm <- glm (diagnosis ~1, data = workfile, family ="binomial")
+step(forward_glm, direction = "forward",scope=formula(full_model))
+```
 
-forwar_model = step(null_model, 
-                    scope = list(lower = formula(null_model),
-                                 uper = formula(null_model)),
-                    direction = "forward")
+```{r, warning=F, include=F}
+#Both direction
+step(forward_glm, direction = "both",scope=formula(full_model))
 ```
 
 
 # Apply logistic regression to data 
-
-```{r}
-train_control = trainControl(method = "repeatedcv", number = 10, repeats = 20)
-```
-
-```{r, include = F, echo  =F}
+```{r, include = F}
 # Set the train and test part of valiadation dataset
 index_set = sample(2, nrow(workfile), replace = T, prob = c(0.7, 0.3))
 train_workfile = workfile[index_set == 1,] 
 test_workfile = workfile[index_set == 2,]
 ```
 
-To make the logistic regression model more efficient (or improve the probability of the prediction), I will separate the characteristic variable to different part such as: size, shape, surface
-
-+ Every variable
 ```{r}
-by_all = function(workfile, train_control){
-  workfile_glm = train(diagnosis~.,
-                       data = workfile, 
-                       trControl = train_control, 
-                       method = "glm", 
-                       family = binomial())
-  return(workfile_glm)
-}
+train_control = trainControl(method = "LOOCV", number = nrow(train_workfile))
 ```
 
-+ Size: Radius, perimeter, area, compactness, fractal dimension
-
-```{r}
-by_size = function(workfile, train_control){
-  workfile_glm = train(diagnosis~radius_mean + radius_se + radius_worst + 
-                         perimeter_mean + perimeter_se + perimeter_worst + 
-                         area_mean + area_se + area_worst + 
-                         compactness_mean + compactness_se + compactness_worst + 
-                         fractal_dimension_mean +  fractal_dimension_se + fractal_dimension_worst
-                       ,data = workfile, 
-                       trControl = train_control, 
-                       method = "glm", 
-                       family = binomial())
-  
-  return(workfile_glm)
-}
-```
-
-+ Shape, surface: texture, smoothness, concavity, concave.points, symmetry, fractal dimension
-
-```{r}
-by_shape = function(workfile, train_control){
-  workfile_glm = train(diagnosis~ texture_mean + texture_se + texture_worst + 
-                         smoothness_mean + smoothness_se + smoothness_worst + 
-                         concavity_mean + concavity_se + concavity_worst + 
-                         concave.points_mean + concave.points_se + concave.points_worst + 
-                         symmetry_mean + symmetry_se + symmetry_worst + 
-                         fractal_dimension_mean +  fractal_dimension_se + fractal_dimension_worst, 
-                       data = workfile,
-                       method = "glm", 
-                       family = binomial())
-  return(workfile_glm)
-}
-
-```
 
 + Stepwise Backward suggest
 
 ```{r}
+# glm(diagnosis~.)
 by_stepwise_backward = function(workfile, train_control){
   workfile_glm = train(diagnosis ~ radius_mean + texture_mean + area_mean + smoothness_mean + 
     compactness_mean + concavity_mean + concave.points_mean + 
@@ -199,6 +156,7 @@ by_stepwise_backward = function(workfile, train_control){
     perimeter_worst + area_worst + concavity_worst + symmetry_worst + 
     fractal_dimension_worst, 
                        data = workfile,
+                       trControl = train_control,
                        method = "glm", 
                        family = binomial())
   
@@ -209,50 +167,117 @@ by_stepwise_backward = function(workfile, train_control){
 + Stepwise Forward Suggest
 
 ```{r}
-
+by_stepwise_forward = function(workfile, train_control){
+  workfile_glm = train(diagnosis ~ perimeter_worst + smoothness_worst + 
+    texture_worst + radius_se + symmetry_worst + compactness_se + 
+    concavity_mean + texture_se + area_se + concave.points_worst, 
+                       data = workfile,
+                       trControl = train_control,
+                       method = "glm", 
+                       family = binomial())
+  
+  return(workfile_glm)
+}
 ```
 
-
++ Both direction suggest
+```{r}
+by_stepwise_both = function(workfile, train_control){
+  workfile_glm = train(diagnosis ~ smoothness_worst + texture_worst + 
+    symmetry_worst + compactness_se + concavity_mean + texture_se + 
+    area_se + concave.points_worst + area_worst, 
+                       data = workfile,
+                       method = "glm",
+                       trControl = train_control,
+                       family = binomial())
+  
+  return(workfile_glm)
+}
+```
 #  Build a Train - Test of Logistic Regression 
-
-Train - test by size
+ + Predicting _ forward
 
 ```{r, warning=F}
-workfile_glm = by_all(workfile, train_control)
+workfile_glm = by_stepwise_forward(train_workfile, train_control)
 workfile_glm
 summary(workfile_glm)
 ```
 
 ```{r}
 # now ewe predict on the test data
-y_hat = predict(workfile_glm, newdata = workfile)
-confusionMatrix(y_hat, workfile$diagnosis)
+y_hat = predict(workfile_glm, newdata = test_workfile)
+y_hat_prob = predict(workfile_glm, newdata = test_workfile, type = "prob")
+test_workfile$predict_diagnosis = y_hat
+test_workfile$predict_diagnosis_prob = y_hat_prob$M
 
 ```
 
 ```{r}
-y_hat = as.vector(y_hat)
-diagnosis = as.vector(test_workfile$diagnosis)
-
-check_table = data.frame(ML_result = y_hat, correct_result = diagnosis ) %>% 
-  mutate(checked = ifelse(ML_result == correct_result, "Yes", "No"))
+confusionMatrix(y_hat, test_workfile$diagnosis)
 ```
 
-# Visualization
+```{r}
+test_workfile$predict_diagnosis = y_hat
+test_workfile = test_workfile %>% dplyr::select(diagnosis, predict_diagnosis, predict_diagnosis_prob, everything())
+head(test_workfile)
+```
+
+```{r}
+plot(as.numeric(diagnosis)-1~ texture_se, data = train_workfile, col = "blue")
+points(predict_diagnosis_prob~ texture_se, data = test_workfile, col = predict_diagnosis)
+abline(h = 0.5, lty = 3)
+
+```
+
+```{r, fig.width=12, fig.height=6}
+
+plts = lapply(names(workfile_glm$finalModel$coefficients)[-1],function(i){
+       return(plot(ggpredict(workfile_glm$finalModel,i)))
+       })
+
+wrap_plots(plts)
+```
 
 
++ Predicting _ backward
 
+```{r, warning=F}
+workfile_glm = by_stepwise_backward(train_workfile, train_control)
+workfile_glm
+summary(workfile_glm)
+```
 
+```{r}
+# now ewe predict on the test data
+y_hat = predict(workfile_glm, newdata = test_workfile)
+y_hat_prob = predict(workfile_glm, newdata = test_workfile, type = "prob")
+test_workfile$predict_diagnosis = y_hat
+test_workfile$predict_diagnosis_prob = y_hat_prob$M
 
+```
 
+```{r}
+confusionMatrix(y_hat, test_workfile$diagnosis)
+```
 
+```{r}
+test_workfile$predict_diagnosis = y_hat
+test_workfile = test_workfile %>% dplyr::select(diagnosis, predict_diagnosis, predict_diagnosis_prob, everything())
+head(test_workfile)
+```
 
+```{r}
+plot(as.numeric(diagnosis)-1~ perimeter_mean, data = train_workfile, col = "blue")
+points(predict_diagnosis_prob~ perimeter_mean, data = test_workfile, col = predict_diagnosis)
+abline(h = 0.5, lty = 3)
 
+```
 
+```{r, fig.width=12, fig.height=6}
 
+plts = lapply(names(workfile_glm$finalModel$coefficients)[-1],function(i){
+       return(plot(ggpredict(workfile_glm$finalModel,i)))
+       })
 
-
-
-
-
-
+wrap_plots(plts)
+```
